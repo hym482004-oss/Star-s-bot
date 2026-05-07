@@ -27,8 +27,31 @@ def extract_r(line):
     return int(match.group(1)) if match else 0
 
 
+# 🔥 CORE CALCULATION (basic version)
+def calculate_block(nums, r):
+    count = len(nums)
+
+    # basic rule simulation (simplified engine)
+    if count == 1:
+        base = 1
+    elif count == 2:
+        base = 2
+    elif count >= 3:
+        base = 3
+    else:
+        base = 0
+
+    total = base * r if r else base * 100
+
+    return {
+        "count": count,
+        "base": base,
+        "r": r,
+        "total": total
+    }
+
+
 def clean_lines(text):
-    # only keep lines that contain digits
     lines = text.split("\n")
     return [l for l in lines if re.search(r"\d", l)]
 
@@ -37,11 +60,13 @@ def parse_line(line):
     nums = extract_numbers(line)
     r_value = extract_r(line)
 
+    calc = calculate_block(nums, r_value)
+
     return {
         "raw": line,
         "numbers": nums,
         "r": r_value,
-        "count": len(nums)
+        "calc": calc
     }
 
 
