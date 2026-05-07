@@ -60,7 +60,7 @@ async def handle(message: Message):
             if a.user.username:
                 mentions.append(f"@{a.user.username}")
         if not mentions:
-            mentions = ["@owner", "@admin1"] # Default
+            mentions = ["@owner", "@admin1"]
 
         await message.reply(
             f"📢 {' '.join(mentions)}\n"
@@ -71,6 +71,10 @@ async def handle(message: Message):
     # 🔥 PARSE
     data = parse_message(message.text)
     total_amount = data["grand_total"]
+    
+    if total_amount == 0:
+        return # လုံးဝမတွက်ချက်ရင် ပြန်မပေးတော့ဘူး
+
     discount = int(total_amount * (percent / 100))
     final = total_amount - discount
 
