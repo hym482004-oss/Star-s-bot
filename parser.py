@@ -4,40 +4,23 @@ import re
 # 🔥 RULE KEYWORDS
 # =====================
 RULES = {
-    "direct": ["ဒဲ့", " ", "-", "*", "/", "."],
-
+    "direct": ["ဒဲ့", " ", "-", "*", "/", ".", ":"],
     "r": ["r", "အာ"],
-
     "pat": ["ပတ်", "ပါ", "အပါ"],
-
     "pat_pu": ["ပတ်ပူး", "ပူးပို", "ပတ်ပူးပို", "ထပ်", "ထန်", "ထိပ်ပိတ်", "ထိပ်နောက်"],
-
     "top": ["ထိပ်", "ထ", "top", "t"],
-
     "brake": ["ဘရိတ်", "bk"],
-
     "even_brake": ["စုံဘရိတ်", "စဘရိတ်", "စုံbk", "မbk", "မဘရိတ်"],
-
     "khwe": ["ခွေ", "ခ", "အခွေ"],
-
     "khwe_pu": ["ခွေပူး", "ပူး", "အပူး"],
-
     "power": ["ပါဝါ", "pw", "ပဝ"],
-
     "nk": ["နက္ခတ်", "nk", "နက်", "နခ"],
-
     "bro": ["ညီကို", "ညီအကို", "ညီအစ်ကို"],
-
     "pait": ["ပိတ်", "အပိတ်", "ပ"],
-
     "ma_pu": ["မပူး"],
-
     "so_pu": ["စုံပူး"],
-
     "sam": ["စမ", "စစ", "မမ", "စုံစုံ", "စုံမ", "မစုံ"],
-
     "khap": ["ခပ်"],
-
     "kap": ["ကပ်", "ကို", "အကပ်"]
 }
 
@@ -51,11 +34,13 @@ def normalize(text):
 # 🔥 CLEAN TEXT
 # =====================
 def clean_text(text):
-    text = re.sub(r'\bme\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bdu\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bmm\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\blaos\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\bld\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(me|mega|မီ|မီဂါ)\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(du|dubai|ဒူ|ဒူဘိုင်း)\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(mm)\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(lao|laos|loadon|laodon|လာအို)\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(ld|london|လန်ဒန်)\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(glo|global|ဂလိုဘယ်)\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\b(maxi|max|မက်ဆီ|မက်စီ)\s*\d+\b', '', text, flags=re.IGNORECASE)
     return text
 
 # =====================
@@ -66,28 +51,30 @@ def extract_numbers(text):
 
 def extract_price_full(text):
     """
-    Return (price_norm, price_rev)
+    Return price
     """
-    numbers = re.findall(r"\d+", text)
-    if not numbers:
-        return 0, 0
-
-    # Check for reverse format XrY
-    match_rev = re.search(r'(\d+)\s*[rR]\s*(\d+)', text)
+    # Check for reverse format: ...R50 or ...R1000
+    match_rev = re.search(r'[rR]\s*(\d+)', text)
     if match_rev:
-        return int(match_rev.group(1)), int(match_rev.group(2))
+        p = int(match_rev.group(1))
+        return p, p
     
     # Otherwise take LAST number as price
-    last_num = int(numbers[-1])
-    return last_num, last_num
+    numbers = re.findall(r"\d+", text)
+    if numbers:
+        last_num = int(numbers[-1])
+        return last_num, last_num
+    
+    return 0, 0
 
 # =====================
 # 🔥 RULE DETECT
 # =====================
 def detect_rule(text):
+    text_lower = text.lower()
     for rule, keys in RULES.items():
         for k in keys:
-            if k in text:
+            if k.lower() in text_lower:
                 return rule
     return "direct"
 
@@ -101,71 +88,55 @@ def calculate(rule, nums, price_norm, price_rev, line):
 
     if rule == "khwe":
         base = n * (n - 1)
-
     elif rule == "khwe_pu":
         base = (n * (n - 1)) + n
-
     elif rule == "pat":
         base = 19
-
     elif rule == "pat_pu":
         base = 20
-
     elif rule == "top":
         base = 10
-
     elif rule == "brake":
         if nums:
             base = int(nums[0])
         else:
             base = 10
-
     elif rule == "even_brake":
         base = 50
-
     elif rule == "power":
         base = 10
-
     elif rule == "nk":
         base = 10
-
     elif rule == "bro":
         base = 20
-
     elif rule == "pait":
         base = 10
-
     elif rule == "ma_pu":
         base = 5
-
     elif rule == "so_pu":
         base = 5
-
     elif rule == "sam":
         base = 25
-
     elif rule == "khap":
         if nums:
             n_digit = len(nums[0])
             base = n_digit * n_digit
         else:
             base = 0
-
     elif rule == "kap":
         if len(nums) >= 2:
             base = len(nums[0]) * len(nums[1])
         else:
             base = 0
-
     else: # direct
         base = len(nums) if nums else 0
 
     # --- Reverse Check ---
-    is_reverse = bool(re.search(r'r|အာ', line))
+    is_reverse = bool(re.search(r'r|အာ', line, re.IGNORECASE))
     
     total = base * price_norm
-    if is_reverse and price_rev != price_norm:
-        total += base * price_rev
+    if is_reverse:
+        total += base * price_norm # R ဆို နှစ်ခါတွက်
 
     return base, total
 
@@ -184,6 +155,7 @@ def parse_message(text):
     work_text = work_text.replace("*", "\n")
     work_text = work_text.replace("/", "\n")
     work_text = work_text.replace(".", "\n")
+    work_text = work_text.replace(":", "\n")
     lines = work_text.splitlines()
 
     results = []
