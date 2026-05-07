@@ -1,44 +1,77 @@
 import re
 
-# 🔥 BASIC NORMALIZE
-def normalize(text: str):
+# =====================
+# 🔥 RULE KEYWORDS
+# =====================
+RULES = {
+    "direct": ["-", "=", " "],
+
+    "r": ["r", "အာ"],
+
+    "pat": ["ပတ်", "ပါ", "အပါ"],
+
+    "pat_pu": ["ပတ်ပူး", "ခပ", "အခွေပူး", "ထပ", "ထန", "ထိပ်ပိတ်", "ထိပ်နောက်"],
+
+    "top": ["ထိပ်", "ထ", "top", "t"],
+
+    "brake": ["ဘရိတ်", "bk"],
+
+    "even_brake": ["စုံဘရိတ်", "စဘရိတ်"],
+
+    "khwe": ["ခွေ", "ခ", "အခွေ"],
+
+    "khwe_pu": ["ခွေပူး"],
+
+    "power": ["ပါဝါ", "pw", "ပဝ"],
+
+    "nk": ["နက္ခတ်", "nk"],
+
+    "bro": ["ညီကို", "ညီအကို", "ညီအစ်ကို"],
+
+    "pait": ["ပိတ်", "အပိတ်", "ပ"]
+}
+
+# =====================
+# 🔥 NORMALIZE
+# =====================
+def normalize(text):
     return text.lower()
 
-
-# 🔥 extract numbers
+# =====================
+# 🔥 EXTRACT
+# =====================
 def extract_numbers(text):
     return re.findall(r"\d+", text)
 
 
-# 🔥 extract amount
-def extract_r(text):
-    match = re.search(r"r\s*(\d+)|(\d+)%", text)
-    if match:
-        return int(match.group(1) or match.group(2))
+def extract_amount(text):
+    m = re.search(r"r\s*(\d+)|(\d+)$", text)
+    if m:
+        return int(m.group(1) or m.group(2))
     return 0
 
 
-# 🔥 detect %
 def extract_percent(text):
-    match = re.search(r"(\d+)\s*%", text)
-    return int(match.group(1)) if match else 0
+    m = re.search(r"(\d+)%", text)
+    return int(m.group(1)) if m else 0
 
 
-# 🔥 RULE DETECT (simple version)
+# =====================
+# 🔥 RULE DETECT
+# =====================
 def detect_rule(text):
-    if "ခွေ" in text:
-        return "khwe"
-    if "ခွေပူး" in text or "ခပ" in text:
-        return "khwe_pu"
-    if "ထိပ်" in text:
-        return "top"
-    if "ဘရိတ်" in text:
-        return "brake"
+    for rule, keys in RULES.items():
+        for k in keys:
+            if k in text:
+                return rule
     return "direct"
 
 
+# =====================
 # 🔥 CALC ENGINE
+# =====================
 def calculate(rule, nums, amount):
+
     n = len(nums)
 
     if rule == "khwe":
@@ -47,32 +80,59 @@ def calculate(rule, nums, amount):
     elif rule == "khwe_pu":
         base = (n * (n - 1)) + n
 
+    elif rule == "pat":
+        base = 19
+
+    elif rule == "pat_pu":
+        base = 20
+
     elif rule == "top":
         base = 10
 
     elif rule == "brake":
         base = 10
 
+    elif rule == "even_brake":
+        base = 50
+
+    elif rule == "power":
+        base = 10
+
+    elif rule == "nk":
+        base = 10
+
+    elif rule == "bro":
+        base = 20
+
+    elif rule == "pait":
+        base = 10
+
     else:
         base = 1
 
-    total = base * (amount if amount else 100)
+    if amount:
+        total = base * amount
+    else:
+        total = base * 100
 
     return base, total
 
 
-# 🔥 PARSE LINE
+# =====================
+# 🔥 MAIN PARSE
+# =====================
 def parse_message(text):
+
     text = normalize(text)
-    lines = text.split("\n")
+    lines = text.split()
 
     results = []
-
     grand_total = 0
 
     for line in lines:
+
         nums = extract_numbers(line)
-        amount = extract_r(line)
+        amount = extract_amount(line)
         percent = extract_percent(line)
 
         rule = detect_rule(line)
@@ -81,8 +141,7 @@ def parse_message(text):
 
         # % deduction
         if percent:
-            minus = total * percent / 100
-            total = total - minus
+            total = total - (total * percent / 100)
 
         grand_total += total
 
@@ -92,10 +151,10 @@ def parse_message(text):
             "base": base,
             "amount": amount,
             "percent": percent,
-            "total": total
+            "total": int(total)
         })
 
     return {
         "lines": results,
-        "grand_total": grand_total
+        "grand_total": int(grand_total)
     }
