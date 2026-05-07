@@ -93,7 +93,7 @@ def detect_rule(text):
 # =====================
 # 🔥 CALC ENGINE
 # =====================
-def calculate(rule, nums, price_norm, price_rev):
+def calculate(rule, nums, price_norm, price_rev, line):
 
     n = len(nums)
     base = 0
@@ -114,7 +114,11 @@ def calculate(rule, nums, price_norm, price_rev):
         base = 10
 
     elif rule == "brake":
-        base = 10
+        # 3bk, 8bk ဆိုရင် ရှေ့ကဂဏန်းကို ယူ၊ မရှိရင် 10
+        if nums:
+            base = int(nums[0])
+        else:
+            base = 10
 
     elif rule == "even_brake":
         base = 50
@@ -157,13 +161,14 @@ def calculate(rule, nums, price_norm, price_rev):
         base = len(nums) if nums else 0
 
     # --- Reverse Check ---
-    is_reverse = bool(re.search(r'r|အာ', rule) or any(k in rule for k in ['r', 'အာ']))
+    is_reverse = bool(re.search(r'r|အာ', line))
     
     total = base * price_norm
     if is_reverse and price_rev != price_norm:
         total += base * price_rev
 
     return base, total
+
 
 # =====================
 # 🔥 MAIN PARSE
@@ -193,7 +198,7 @@ def parse_message(text):
         nums = extract_numbers(line)
         rule = detect_rule(line)
 
-        base, total = calculate(rule, nums, price_norm, price_rev)
+        base, total = calculate(rule, nums, price_norm, price_rev, line)
 
         grand_total += total
 
