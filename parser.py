@@ -1,130 +1,101 @@
-# 🔥 RULE KEYWORDS
-RULES = {
-    "pat": ["ပတ်", "အပါ", "ပါ"],
-    "pat_pu": ["ပတ်ပူး", "ပူးပို", "ပတ်ပူးပို", "ထန", "ထပ", "ထိပ်ပိတ်", "ထိပ်နောက်"],
-    "khwe": ["ခွေ", "အခွေ", "ခ"],
-    "khwe_pu": ["ခွေပူး", "ခပ", "အခွေပူး"],
-    "top": ["ထိပ်", "ထိပ်စီး", "အထိပ်", "ထ", "top", "t"],
-    "brake": ["ဘရိတ်", "bk"],
-    "even_brake": ["စုံဘရိတ်", "စုံbk", "စဘရိတ်"],
-    "odd_brake": ["မဘရိတ်", "မbk"],
-    "power": ["ပါဝါ", "ပဝ", "pw", "power"],
-    "nk": ["နက္ခတ်", "နက", "နခ", "nk"],
-    "bro": ["ညီကို", "ညီအကို", "ညီအစ်ကို"],
-    "pait": ["ပိတ်", "အပိတ်"],
-}
+import re
+
+# 🔥 BASIC NORMALIZE
+def normalize(text: str):
+    return text.lower()
 
 
-# 🔥 BLOCK COUNTS
-BLOCKS = {
-    "direct": 1,
-    "r": 2,
-    "pat": 19,
-    "pat_pu": 20,
-    "top": 10,
-    "brake": 10,
-    "even_brake": 50,
-    "odd_brake": 50,
-    "power": 10,
-    "nk": 10,
-    "bro": 20,
-    "pait": 10,
-}
+# 🔥 extract numbers
+def extract_numbers(text):
+    return re.findall(r"\d+", text)
 
 
-def detect_rule(line):
-    for rule, keywords in RULES.items():
-        for kw in keywords:
-            if kw in line:
-                return rule
+# 🔥 extract amount
+def extract_r(text):
+    match = re.search(r"r\s*(\d+)|(\d+)%", text)
+    if match:
+        return int(match.group(1) or match.group(2))
+    return 0
 
+
+# 🔥 detect %
+def extract_percent(text):
+    match = re.search(r"(\d+)\s*%", text)
+    return int(match.group(1)) if match else 0
+
+
+# 🔥 RULE DETECT (simple version)
+def detect_rule(text):
+    if "ခွေ" in text:
+        return "khwe"
+    if "ခွေပူး" in text or "ခပ" in text:
+        return "khwe_pu"
+    if "ထိပ်" in text:
+        return "top"
+    if "ဘရိတ်" in text:
+        return "brake"
     return "direct"
 
 
-def calculate_block(rule, nums, r):
-    # KHWE
+# 🔥 CALC ENGINE
+def calculate(rule, nums, amount):
+    n = len(nums)
+
     if rule == "khwe":
-        n = len(nums)
         base = n * (n - 1)
 
-    # KHWE PU
     elif rule == "khwe_pu":
-        n = len(nums)
         base = (n * (n - 1)) + n
 
-    # CAP
-    elif "ကပ်" in nums or "ကို" in nums:
-        parts = re.split(r"ကပ်|ကို", nums)
-        left = len(re.findall(r"\d", parts[0]))
-        right = len(re.findall(r"\d", parts[-1]))
-        base = left * right
+    elif rule == "top":
+        base = 10
+
+    elif rule == "brake":
+        base = 10
 
     else:
-        base = BLOCKS.get(rule, 1)
+        base = 1
 
-    # R double
-    if r:
-        total = base * r
-    else:
-        total = base * 100
+    total = base * (amount if amount else 100)
 
-    return {
-        "rule": rule,
-        "base": base,
-        "r": r,
-        "total": total
-    }
+    return base, total
 
 
-def clean_lines(text):
-    lines = text.split("\n")
-    return [l.strip() for l in lines if l.strip()]
-
-
-def parse_line(line):
-    nums = extract_numbers(line)
-
-    # amount
-    amount_match = re.findall(r"r\s*(\d+)|(\d+)$", line)
-    r_value = 0
-
-    if amount_match:
-        last = amount_match[-1]
-        r_value = int(last[0] or last[1])
-
-    # R detect
-    has_r = bool(re.search(r"r|အာ", line))
-
-    # rule detect
-    rule = detect_rule(line)
-
-    # calc
-    calc = calculate_block(rule, nums, r_value)
-
-    # reverse direct
-    if has_r and rule == "direct":
-        calc["base"] = 2
-        calc["total"] = r_value * 2
-
-    return {
-        "raw": line,
-        "numbers": nums,
-        "rule": rule,
-        "r": r_value,
-        "calc": calc
-    }
-
-
-def parse_message(text: str):
+# 🔥 PARSE LINE
+def parse_message(text):
     text = normalize(text)
-    lines = clean_lines(text)
+    lines = text.split("\n")
 
-    parsed = [parse_line(l) for l in lines]
+    results = []
 
-    grand_total = sum(x["calc"]["total"] for x in parsed)
+    grand_total = 0
+
+    for line in lines:
+        nums = extract_numbers(line)
+        amount = extract_r(line)
+        percent = extract_percent(line)
+
+        rule = detect_rule(line)
+
+        base, total = calculate(rule, nums, amount)
+
+        # % deduction
+        if percent:
+            minus = total * percent / 100
+            total = total - minus
+
+        grand_total += total
+
+        results.append({
+            "raw": line,
+            "rule": rule,
+            "base": base,
+            "amount": amount,
+            "percent": percent,
+            "total": total
+        })
 
     return {
-        "raw": text,
-        "lines": parsed,
+        "lines": results,
         "grand_total": grand_total
     }
