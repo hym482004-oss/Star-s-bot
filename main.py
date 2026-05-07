@@ -15,14 +15,22 @@ TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# 🔥 2D NAME LIST
-MARKETS = ["du", "mega", "မီ", "max", "glo", "ld", "lao", "mm"]
+# 🔥 MARKET LIST & PERCENTAGE
+MARKETS = {
+    "du": ["du", "dubai", "ဒူ", "ဒူဘိုင်း"],
+    "me": ["me", "mega", "မီ", "မီဂါ"],
+    "max": ["maxi", "max", "မက်ဆီ", "မက်စီ"],
+    "glo": ["glo", "global", "ဂလို", "ဂလိုဘယ်"],
+    "ld": ["ld", "london", "လန်ဒန်", "လန်လန်"],
+    "lao": ["lao", "laos", "loadon", "laodon", "လာအို", "လာလာ"],
+    "mm": ["mm"]
+}
+
 PERCENT = {
     "du": 7,
-    "mega": 7,
-    "မီ": 7,
+    "me": 7,
     "max": 7,
-    "glo": 7,
+    "glo": 3,
     "ld": 7,
     "lao": 7,
     "mm": 10
@@ -44,13 +52,16 @@ async def handle(message: Message):
     if not re.search(r"\d", text):
         return
 
-    # ❌ no 2D name → mention owner/admin
+    # 🔍 DETECT MARKET
     market_found = None
     percent = 7
-    for m in MARKETS:
-        if m in text:
-            market_found = m.upper()
-            percent = PERCENT.get(m, 7)
+    for key, names in MARKETS.items():
+        for name in names:
+            if name.lower() in text:
+                market_found = key.upper()
+                percent = PERCENT.get(key, 7)
+                break
+        if market_found:
             break
 
     if not market_found:
