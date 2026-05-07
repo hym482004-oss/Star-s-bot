@@ -68,7 +68,9 @@ def extract_price_full(text):
     """
     Return (price_norm, price_rev)
     """
+    # Pattern: 500r100 or 500 R 100
     match_rev = re.search(r'(\d+)\s*[rR]\s*(\d+)', text)
+    # Pattern: ...r500 or ... 500
     match_simple = re.search(r'[rR]?\s*(\d+)\s*$', text)
     
     if match_rev:
@@ -112,6 +114,7 @@ def calculate(rule, nums, price_norm, price_rev, line):
         base = 10
 
     elif rule == "brake":
+        # 3bk, 8bk ဆိုရင် ရှေ့ကဂဏန်းကို ယူ၊ မရှိရင် 10
         if nums:
             base = int(nums[0])
         else:
