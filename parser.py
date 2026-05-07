@@ -16,42 +16,31 @@ RULES = {
     "kap": ["ကပ်", "ကို", "အကပ်"]
 }
 
-def clean_text(text):
-    # Market name များကို ရှင်းလင်းခြင်း
-    to_remove = r'(me|mega|မီ|မီဂါ|du|dubai|ဒူ|ဒူဘိုင်း|dubi|mm|lao|laos|loadon|laodon|လာအို|လာလာ|ld|london|လန်ဒန်|လန်လန်|glo|global|ဂလို|maxi|max|မက်ဆီ|မက်စီ)'
-    return re.sub(to_remove, '', text, flags=re.IGNORECASE)
-
 def parse_message(text):
     if not text: return {"grand_total": 0}
-    
-    # စာသားကို သန့်စင်ပြီး အပိုင်းလိုက်ခွဲခြင်း
-    work_text = clean_text(text.lower())
-    # အဓိက ခွဲခြားမည့် သင်္ကေတများ (\n, *, /, =)
-    parts = re.split(r'[\n\*/=]', work_text)
-    
+    lines = text.lower().replace('=', '\\n').replace('*', '\\n').replace('/', '\\n').split('\\n')
     grand_total = 0
 
-    for part in parts:
-        part = part.strip()
-        if not part: continue
+    for line in lines:
+        line = line.strip()
+        if not line: continue
         
-        # ပိုက်ဆံပမာဏကို ရှာဖွေခြင်း (စာကြောင်းတစ်ကြောင်းချင်းစီ၏ နောက်ဆုံးဂဏန်း)
-        nums = re.findall(r'\d+', part)
+        nums = re.findall(r'\\d+', line)
         if not nums: continue
         
         try:
-            price = int(nums[-1]) # နောက်ဆုံးဂဏန်းသည် ပမာဏ
-            main_nums = nums[:-1] if len(nums) > 1 else nums
+            # စျေးနှုန်းကို ရှာဖွေခြင်း
+            price = int(nums[-1])
+            main_nums = nums[:-1]
             
             # Rule ရှာဖွေခြင်း
             rule = "direct"
             for r_key, keywords in RULES.items():
-                if any(k in part for k in keywords):
+                if any(k in line for k in keywords):
                     rule = r_key
                     break
             
             base = 0
-            # Logic များ
             if rule == "khwe":
                 n = len(str(main_nums[0]))
                 base = n * (n - 1)
@@ -62,29 +51,32 @@ def parse_message(text):
             elif rule == "pat_pu": base = 20 * len(main_nums)
             elif rule == "top": base = 10 * len(main_nums)
             elif rule == "brake": base = len(str(main_nums[0])) * 10
-            elif rule == "even_brake": base = 50
             elif rule == "bro": base = 20
             elif rule in ["power", "nk"]: base = 10
-            elif rule == "sam": base = 25
+            elif rule == "sam": base = 50
             elif rule == "kap":
                 if len(main_nums) >= 2:
+                    # ကပ်ဂဏန်းများအတွက် (ဥပမာ- 7350/249)
                     base = len(str(main_nums[0])) * len(str(main_nums[1]))
             else:
-                # Direct ကွက်များ (ဥပမာ 12.13.14)
-                # စာကြောင်းထဲရှိ ဂဏန်း ၂ လုံးတွဲအားလုံးကို ရေတွက်သည်
-                all_twos = re.findall(r'\d{2}', part)
-                # ပိုက်ဆံကို မပါအောင် ပြန်ဖယ်သည်
+                # ဒဲ့အကွက်များ (ဥပမာ- 12 13 14)
+                all_twos = re.findall(r'\\d{2}', line)
                 if str(price) in all_twos: all_twos.remove(str(price))
                 base = len(all_twos) if all_twos else len(main_nums)
 
+            # ဒဲ့တွက်ချက်မှု
             line_total = base * price
             
             # အာ (Reverse) စစ်ဆေးခြင်း
-            if any(k in part for k in RULES["r"]):
-                line_total *= 2
+            if any(k in line for k in RULES["r"]):
+                # r နောက်မှာ စျေးနှုန်းထပ်ပါရင် (ဥပမာ- 100r50)
+                r_match = re.search(r'r\\s*(\\d+)', line)
+                if r_match and int(r_match.group(1)) != price:
+                    line_total = (base * price) + (base * int(r_match.group(1)))
+                else:
+                    line_total *= 2
                 
             grand_total += line_total
-            
         except Exception:
             continue
 
