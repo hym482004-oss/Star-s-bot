@@ -86,13 +86,10 @@ async def handle(message: Message):
         f"Total = {final:,} ကျပ်ဘဲ လွဲပါရှင့်\n"
         f"ကံကောင်းပါစေ"
     )
-
     await message.reply(reply)
-
 
 async def main():
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
