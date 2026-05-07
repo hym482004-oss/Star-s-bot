@@ -1,57 +1,77 @@
+import asyncio
+import os
+import re
+from aiogram import Bot, Dispatcher
+from aiogram.types import Message
+from aiogram.filters import CommandStart
+from dotenv import load_dotenv
+
+from parser import parse_message
+
+load_dotenv()
+
+TOKEN = os.getenv("BOT_TOKEN")
+
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
+
+# 🔥 2D names
+MARKETS = ["du", "mega", "max", "glo", "ld", "lao", "mm"]
+
+
+@dp.message(CommandStart())
+async def start(message: Message):
+    await message.reply("2D Bot စပြီး run နေပြီ ✅")
+
+
 @dp.message()
 async def handle(message: Message):
 
     text = message.text.lower()
 
-    # ✅ 2D names
-    markets = ["du", "mega", "max", "glo", "ld", "lao", "mm"]
-
-    # ✅ detect calculation text
-    has_number = bool(re.search(r"\d", text))
-    has_amount = bool(re.search(r"r\d+|\d+\s*%", text))
-
-    # ❌ ignore normal chat
-    if not has_number:
+    # ❌ ignore no number
+    if not re.search(r"\d", text):
         return
 
-    # ❌ no market name
-    if not any(m in text for m in markets):
+    # ❌ no 2D name → mention admin
+    if not any(m in text for m in MARKETS):
 
         admins = await message.chat.get_administrators()
 
         mentions = []
 
-        for admin in admins:
-            user = admin.user
-
-            if user.username:
-                mentions.append(f"@{user.username}")
-
-        mention_text = " ".join(mentions)
+        for a in admins:
+            if a.user.username:
+                mentions.append(f"@{a.user.username}")
 
         await message.reply(
-            f"⚠️ 2D name မပါသေးပါ\n\n"
-            f"{mention_text}\n"
-            f"ဒါလေးလာစစ်ပေးပါရှင့်"
+            "⚠️ 2D name မပါသေးပါ\n\n"
+            + " ".join(mentions)
+            + "\nဒါလေးလာစစ်ပေးပါရှင့်"
         )
-
         return
 
-    # ✅ parse
+    # 🔥 parse
     data = parse_message(message.text)
-
-    result = ""
 
     for line in data["lines"]:
 
-        result += (
-            f"📌 {line['raw']}\n"
-            f"🎯 {line['rule']}\n"
-            f"🔢 {line['calc']['base']} ကွက်\n"
-            f"💰 {line['r']}\n"
-            f"📦 {line['calc']['total']}\n\n"
+        reply_text = (
+            f"ထိုးသူ = {line['amount']}\n"
+            f"2D name = DETECTED\n"
+            f"Total = {int(line['total'])} ကျပ်\n"
+            f"% cash back = {line['percent']}%\n"
+            f"လွဲရမည့်ငွေ = {int(line['total'])} ကျပ်\n\n"
+            "ကံကောင်းပါစေ 🍀"
         )
 
-    result += f"✅ TOTAL = {data['grand_total']}"
+        await message.reply(reply_text)
 
-    await message.reply(result)
+    await message.reply(f"✅ GRAND TOTAL = {int(data['grand_total'])}")
+
+
+async def main():
+    await dp.start_polling(bot)
+
+
+asyncio.run(main())
