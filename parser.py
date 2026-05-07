@@ -1,160 +1,34 @@
 import re
 
-# =====================
-# 🔥 RULE KEYWORDS
-# =====================
-RULES = {
-    "direct": ["-", "=", " "],
+def normalize_text(text):
+    """စာကြောင်းကို သပ်ရပ်အောင် ပြုပြင်တာ၊ သင်္ကေတတွေကို နေရာချတာ"""
+    text = text.lower()
+    text = text.replace("=", "\n")
+    text = text.replace("-", "\n")
+    text = text.replace("/", " ")
+    text = text.replace(".", " ")
+    text = text.replace("*", " ")
+    text = re.sub(r'\s+', ' ', text)
+    return text
 
-    "r": ["r", "အာ"],
+def extract_price(text):
+    """ဈေးနှုန်း ထုတ်ယူတာ၊ R ပါရင် ပုံမှန်၊ ပြောင်းပြန် ခွဲတာ"""
+    # Pattern: 500r100 or 500 R 100
+    match_rev = re.search(r'(\d+)\s*[rR]\s*(\d+)', text)
+    # Pattern: 500 (တစ်ခုတည်း)
+    match_norm = re.search(r'(\d+)\s*$', text)
 
-    "pat": ["ပတ်", "ပါ", "အပါ"],
-
-    "pat_pu": ["ပတ်ပူး", "ခပ", "အခွေပူး", "ထပ", "ထန", "ထိပ်ပိတ်", "ထိပ်နောက်"],
-
-    "top": ["ထိပ်", "ထ", "top", "t"],
-
-    "brake": ["ဘရိတ်", "bk"],
-
-    "even_brake": ["စုံဘရိတ်", "စဘရိတ်"],
-
-    "khwe": ["ခွေ", "ခ", "အခွေ"],
-
-    "khwe_pu": ["ခွေပူး"],
-
-    "power": ["ပါဝါ", "pw", "ပဝ"],
-
-    "nk": ["နက္ခတ်", "nk"],
-
-    "bro": ["ညီကို", "ညီအကို", "ညီအစ်ကို"],
-
-    "pait": ["ပိတ်", "အပိတ်", "ပ"]
-}
-
-# =====================
-# 🔥 NORMALIZE
-# =====================
-def normalize(text):
-    return text.lower()
-
-# =====================
-# 🔥 EXTRACT
-# =====================
-def extract_numbers(text):
-    return re.findall(r"\d+", text)
-
-
-def extract_amount(text):
-    m = re.search(r"r\s*(\d+)|(\d+)$", text)
-    if m:
-        return int(m.group(1) or m.group(2))
-    return 0
-
-
-def extract_percent(text):
-    m = re.search(r"(\d+)%", text)
-    return int(m.group(1)) if m else 0
-
-
-# =====================
-# 🔥 RULE DETECT
-# =====================
-def detect_rule(text):
-    for rule, keys in RULES.items():
-        for k in keys:
-            if k in text:
-                return rule
-    return "direct"
-
-
-# =====================
-# 🔥 CALC ENGINE
-# =====================
-def calculate(rule, nums, amount):
-
-    n = len(nums)
-
-    if rule == "khwe":
-        base = n * (n - 1)
-
-    elif rule == "khwe_pu":
-        base = (n * (n - 1)) + n
-
-    elif rule == "pat":
-        base = 19
-
-    elif rule == "pat_pu":
-        base = 20
-
-    elif rule == "top":
-        base = 10
-
-    elif rule == "brake":
-        base = 10
-
-    elif rule == "even_brake":
-        base = 50
-
-    elif rule == "power":
-        base = 10
-
-    elif rule == "nk":
-        base = 10
-
-    elif rule == "bro":
-        base = 20
-
-    elif rule == "pait":
-        base = 10
-
+    if match_rev:
+        return int(match_rev.group(1)), int(match_rev.group(2))
+    elif match_norm:
+        return int(match_norm.group(1)), int(match_norm.group(1))
     else:
-        base = 1
+        return 0, 0
 
-    if amount:
-        total = base * amount
-    else:
-        total = base * 100
-
-    return base, total
-
-
-# =====================
-# 🔥 MAIN PARSE
-# =====================
-def parse_message(text):
-
-    text = normalize(text)
-    lines = text.split()
-
-    results = []
-    grand_total = 0
-
-    for line in lines:
-
-        nums = extract_numbers(line)
-        amount = extract_amount(line)
-        percent = extract_percent(line)
-
-        rule = detect_rule(line)
-
-        base, total = calculate(rule, nums, amount)
-
-        # % deduction
-        if percent:
-            total = total - (total * percent / 100)
-
-        grand_total += total
-
-        results.append({
-            "raw": line,
-            "rule": rule,
-            "base": base,
-            "amount": amount,
-            "percent": percent,
-            "total": int(total)
-        })
-
-    return {
-        "lines": results,
-        "grand_total": int(grand_total)
-    }
+def clean_company_tags(text):
+    """Me 10, Du7 စတာတွေကို ဖျက်ပစ်တာ"""
+    text = re.sub(r'\bme\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bdu\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bmm\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\blaos\s*\d+\b', '', text, flags=re.IGNORECASE)
+    return text
