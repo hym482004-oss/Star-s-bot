@@ -51,7 +51,6 @@ def normalize(text):
 # 🔥 CLEAN TEXT
 # =====================
 def clean_text(text):
-    """Me 10, Du7, MM10 စတာတွေကို ဖျက်ပစ်တာ"""
     text = re.sub(r'\bme\s*\d+\b', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\bdu\s*\d+\b', '', text, flags=re.IGNORECASE)
     text = re.sub(r'\bmm\s*\d+\b', '', text, flags=re.IGNORECASE)
@@ -65,21 +64,21 @@ def clean_text(text):
 def extract_numbers(text):
     return re.findall(r"\d+", text)
 
-
-def extract_amount(text):
-    # R ပါရင် ပထမဂဏန်းကို ယူ၊ မပါရင် နောက်ဆုံးဂဏန်းကို ယူ
-    m = re.search(r"(\d+)\s*r\s*(\d+)|(\d+)$", text)
-    if m:
-        return int(m.group(1) or m.group(3))
-    return 0
-
-def extract_amount_rev(text):
-    # R ပါရင် ဒုတိယဂဏန်းကို ယူ
-    m = re.search(r"(\d+)\s*r\s*(\d+)", text)
-    if m:
-        return int(m.group(2))
-    return 0
-
+def extract_price_full(text):
+    """
+    Return (price_norm, price_rev)
+    """
+    # Pattern: 500r100 or 500 R 100
+    match_rev = re.search(r'(\d+)\s*[rR]\s*(\d+)', text)
+    # Pattern: ...r500 or ... 500
+    match_simple = re.search(r'[rR]?\s*(\d+)\s*$', text)
+    
+    if match_rev:
+        return int(match_rev.group(1)), int(match_rev.group(2))
+    elif match_simple:
+        return int(match_simple.group(1)), int(match_simple.group(1))
+    else:
+        return 0, 0
 
 # =====================
 # 🔥 RULE DETECT
@@ -91,14 +90,13 @@ def detect_rule(text):
                 return rule
     return "direct"
 
-
 # =====================
 # 🔥 CALC ENGINE
 # =====================
-def calculate(rule, nums, amount, amount_rev=0, is_reverse=False):
+def calculate(rule, nums, price_norm, price_rev):
 
     n = len(nums)
-    total = 0
+    base = 0
 
     if rule == "khwe":
         base = n * (n - 1)
@@ -155,17 +153,17 @@ def calculate(rule, nums, amount, amount_rev=0, is_reverse=False):
         else:
             base = 0
 
-    else:
-        base = len(nums) if nums else 1
+    else: # direct
+        base = len(nums) if nums else 0
 
-    # Calculate Total
-    if is_reverse and amount_rev > 0:
-        total = (base * amount) + (base * amount_rev)
-    else:
-        total = base * amount
+    # --- Reverse Check ---
+    is_reverse = bool(re.search(r'r|အာ', rule) or any(k in rule for k in ['r', 'အာ']))
+    
+    total = base * price_norm
+    if is_reverse and price_rev != price_norm:
+        total += base * price_rev
 
     return base, total
-
 
 # =====================
 # 🔥 MAIN PARSE
@@ -173,16 +171,19 @@ def calculate(rule, nums, amount, amount_rev=0, is_reverse=False):
 def parse_message(text):
 
     raw_text = text
-    text = normalize(text)
-    text = clean_text(text)
+    work_text = clean_text(normalize(text))
 
     # Split by symbols
-    text = text.replace("=", "\n")
-    text = text.replace("-", "\n")
-    lines = text.splitlines()
+    work_text = work_text.replace("=", "\n")
+    work_text = work_text.replace("-", "\n")
+    work_text = work_text.replace("*", "\n")
+    lines = work_text.splitlines()
 
     results = []
     grand_total = 0
+
+    # Get Price ONCE from full text
+    price_norm, price_rev = extract_price_full(raw_text)
 
     for line in lines:
         line = line.strip()
@@ -190,13 +191,9 @@ def parse_message(text):
             continue
 
         nums = extract_numbers(line)
-        amount = extract_amount(raw_text)
-        amount_rev = extract_amount_rev(raw_text)
-
         rule = detect_rule(line)
-        is_reverse = any(k in line for k in ["r", "အာ"])
 
-        base, total = calculate(rule, nums, amount, amount_rev, is_reverse)
+        base, total = calculate(rule, nums, price_norm, price_rev)
 
         grand_total += total
 
@@ -204,7 +201,7 @@ def parse_message(text):
             "raw": line,
             "rule": rule,
             "base": base,
-            "amount": amount,
+            "amount": price_norm,
             "total": int(total)
         })
 
