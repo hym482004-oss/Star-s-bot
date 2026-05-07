@@ -1,50 +1,75 @@
-import re
-
-# alias system
-ALIASES = {
-    "du": "DU", "dubai": "DU", "ဒူ": "DU",
-    "mega": "MEGA", "me": "MEGA",
-    "max": "MAX", "maxi": "MAX",
-    "glo": "GLO", "global": "GLO",
-    "ld": "LD", "london": "LD",
-    "lao": "LAO",
-    "mm": "MM",
+# 🔥 RULE KEYWORDS
+RULES = {
+    "pat": ["ပတ်", "အပါ", "ပါ"],
+    "pat_pu": ["ပတ်ပူး", "ပူးပို", "ပတ်ပူးပို", "ထန", "ထပ", "ထိပ်ပိတ်", "ထိပ်နောက်"],
+    "khwe": ["ခွေ", "အခွေ", "ခ"],
+    "khwe_pu": ["ခွေပူး", "ခပ", "အခွေပူး"],
+    "top": ["ထိပ်", "ထိပ်စီး", "အထိပ်", "ထ", "top", "t"],
+    "brake": ["ဘရိတ်", "bk"],
+    "even_brake": ["စုံဘရိတ်", "စုံbk", "စဘရိတ်"],
+    "odd_brake": ["မဘရိတ်", "မbk"],
+    "power": ["ပါဝါ", "ပဝ", "pw", "power"],
+    "nk": ["နက္ခတ်", "နက", "နခ", "nk"],
+    "bro": ["ညီကို", "ညီအကို", "ညီအစ်ကို"],
+    "pait": ["ပိတ်", "အပိတ်"],
 }
 
-def normalize(text: str):
-    text = text.lower()
-    for k, v in ALIASES.items():
-        text = re.sub(rf"\b{k}\b", v.lower(), text)
-    return text
+
+# 🔥 BLOCK COUNTS
+BLOCKS = {
+    "direct": 1,
+    "r": 2,
+    "pat": 19,
+    "pat_pu": 20,
+    "top": 10,
+    "brake": 10,
+    "even_brake": 50,
+    "odd_brake": 50,
+    "power": 10,
+    "nk": 10,
+    "bro": 20,
+    "pait": 10,
+}
 
 
-def extract_numbers(line):
-    return re.findall(r"\d+", line)
+def detect_rule(line):
+    for rule, keywords in RULES.items():
+        for kw in keywords:
+            if kw in line:
+                return rule
+
+    return "direct"
 
 
-def extract_r(line):
-    match = re.search(r"r\s*(\d+)", line)
-    return int(match.group(1)) if match else 0
+def calculate_block(rule, nums, r):
+    # KHWE
+    if rule == "khwe":
+        n = len(nums)
+        base = n * (n - 1)
 
+    # KHWE PU
+    elif rule == "khwe_pu":
+        n = len(nums)
+        base = (n * (n - 1)) + n
 
-# 🔥 CORE CALCULATION (basic version)
-def calculate_block(nums, r):
-    count = len(nums)
+    # CAP
+    elif "ကပ်" in nums or "ကို" in nums:
+        parts = re.split(r"ကပ်|ကို", nums)
+        left = len(re.findall(r"\d", parts[0]))
+        right = len(re.findall(r"\d", parts[-1]))
+        base = left * right
 
-    # basic rule simulation (simplified engine)
-    if count == 1:
-        base = 1
-    elif count == 2:
-        base = 2
-    elif count >= 3:
-        base = 3
     else:
-        base = 0
+        base = BLOCKS.get(rule, 1)
 
-    total = base * r if r else base * 100
+    # R double
+    if r:
+        total = base * r
+    else:
+        total = base * 100
 
     return {
-        "count": count,
+        "rule": rule,
         "base": base,
         "r": r,
         "total": total
@@ -53,18 +78,38 @@ def calculate_block(nums, r):
 
 def clean_lines(text):
     lines = text.split("\n")
-    return [l for l in lines if re.search(r"\d", l)]
+    return [l.strip() for l in lines if l.strip()]
 
 
 def parse_line(line):
     nums = extract_numbers(line)
-    r_value = extract_r(line)
 
-    calc = calculate_block(nums, r_value)
+    # amount
+    amount_match = re.findall(r"r\s*(\d+)|(\d+)$", line)
+    r_value = 0
+
+    if amount_match:
+        last = amount_match[-1]
+        r_value = int(last[0] or last[1])
+
+    # R detect
+    has_r = bool(re.search(r"r|အာ", line))
+
+    # rule detect
+    rule = detect_rule(line)
+
+    # calc
+    calc = calculate_block(rule, nums, r_value)
+
+    # reverse direct
+    if has_r and rule == "direct":
+        calc["base"] = 2
+        calc["total"] = r_value * 2
 
     return {
         "raw": line,
         "numbers": nums,
+        "rule": rule,
         "r": r_value,
         "calc": calc
     }
@@ -76,7 +121,10 @@ def parse_message(text: str):
 
     parsed = [parse_line(l) for l in lines]
 
+    grand_total = sum(x["calc"]["total"] for x in parsed)
+
     return {
         "raw": text,
-        "lines": parsed
+        "lines": parsed,
+        "grand_total": grand_total
     }
