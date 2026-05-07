@@ -1,2 +1,1 @@
-aiogram==3.*
-python-dotenv
+python-telegram-bot==20.x
