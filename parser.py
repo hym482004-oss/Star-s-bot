@@ -1,8 +1,3 @@
-# 2D logic will go here later
-# 2D BOT LOGIC ENGINE
-
-def parse_message(text):
-    return text
 import re
 
 # alias system
@@ -34,12 +29,9 @@ def normalize(text: str):
 def parse_message(text: str):
     text = normalize(text)
 
-    # split lines
     lines = text.split("\n")
 
-    result = {
+    return {
         "raw": text,
         "lines": lines,
     }
-
-    return result
