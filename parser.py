@@ -1,190 +1,87 @@
 import re
 
-# =====================
-# 🔥 RULE KEYWORDS
-# =====================
-RULES = {
-    "direct": ["ဒဲ့", " ", "-", "*", "/", ".", ":"],
-    "r": ["r", "အာ"],
-    "pat": ["ပတ်", "ပါ", "အပါ"],
-    "pat_pu": ["ပတ်ပူး", "ပူးပို", "ပတ်ပူးပို", "ထပ်", "ထန်", "ထိပ်ပိတ်", "ထိပ်နောက်"],
-    "top": ["ထိပ်", "ထ", "top", "t"],
-    "brake": ["ဘရိတ်", "bk"],
-    "even_brake": ["စုံဘရိတ်", "စဘရိတ်", "စုံbk", "မbk", "မဘရိတ်"],
-    "khwe": ["ခွေ", "ခ", "အခွေ"],
-    "khwe_pu": ["ခွေပူး", "ပူး", "အပူး"],
-    "power": ["ပါဝါ", "pw", "ပဝ"],
-    "nk": ["နက္ခတ်", "nk", "နက်", "နခ"],
-    "bro": ["ညီကို", "ညီအကို", "ညီအစ်ကို"],
-    "pait": ["ပိတ်", "အပိတ်", "ပ"],
-    "ma_pu": ["မပူး"],
-    "so_pu": ["စုံပူး"],
-    "sam": ["စမ", "စစ", "မမ", "စုံစုံ", "စုံမ", "မစုံ"],
-    "khap": ["ခပ်"],
-    "kap": ["ကပ်", "ကို", "အကပ်"]
-}
-
-# =====================
-# 🔥 NORMALIZE
-# =====================
-def normalize(text):
-    return text.lower()
-
-# =====================
-# 🔥 CLEAN TEXT
-# =====================
-def clean_text(text):
-    text = re.sub(r'\b(me|mega|မီ|မီဂါ)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(du|dubai|ဒူ|ဒူဘိုင်း)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(mm)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(lao|laos|loadon|laodon|လာအို)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(ld|london|လန်ဒန်)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(glo|global|ဂလိုဘယ်)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(maxi|max|မက်ဆီ|မက်စီ)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    return text
-
-# =====================
-# 🔥 EXTRACT
-# =====================
-def extract_numbers(text):
-    return re.findall(r"\d+", text)
-
-def extract_price_full(text):
-    """
-    Return price
-    """
-    # Check for reverse format: ...R50 or ...R1000
-    match_rev = re.search(r'[rR]\s*(\d+)', text)
-    if match_rev:
-        p = int(match_rev.group(1))
-        return p, p
+def get_combinations(text):
+    text = text.lower().replace(' ', '').replace('*', '-').replace('/', '-')
     
-    # Otherwise take LAST number as price
-    numbers = re.findall(r"\d+", text)
-    if numbers:
-        last_num = int(numbers[-1])
-        return last_num, last_num
+    # Market & Discount Logic
+    discount = 0
+    market_found = ""
     
-    return 0, 0
-
-# =====================
-# 🔥 RULE DETECT
-# =====================
-def detect_rule(text):
-    text_lower = text.lower()
-    for rule, keys in RULES.items():
-        for k in keys:
-            if k.lower() in text_lower:
-                return rule
-    return "direct"
-
-# =====================
-# 🔥 CALC ENGINE
-# =====================
-def calculate(rule, nums, price_norm, price_rev, line):
-
-    n = len(nums)
-    base = 0
-
-    if rule == "khwe":
-        base = n * (n - 1)
-    elif rule == "khwe_pu":
-        base = (n * (n - 1)) + n
-    elif rule == "pat":
-        base = 19
-    elif rule == "pat_pu":
-        base = 20
-    elif rule == "top":
-        base = 10
-    elif rule == "brake":
-        if nums:
-            base = int(nums[0])
-        else:
-            base = 10
-    elif rule == "even_brake":
-        base = 50
-    elif rule == "power":
-        base = 10
-    elif rule == "nk":
-        base = 10
-    elif rule == "bro":
-        base = 20
-    elif rule == "pait":
-        base = 10
-    elif rule == "ma_pu":
-        base = 5
-    elif rule == "so_pu":
-        base = 5
-    elif rule == "sam":
-        base = 25
-    elif rule == "khap":
-        if nums:
-            n_digit = len(nums[0])
-            base = n_digit * n_digit
-        else:
-            base = 0
-    elif rule == "kap":
-        if len(nums) >= 2:
-            base = len(nums[0]) * len(nums[1])
-        else:
-            base = 0
-    else: # direct
-        base = len(nums) if nums else 0
-
-    # --- Reverse Check ---
-    is_reverse = bool(re.search(r'r|အာ', line, re.IGNORECASE))
-    
-    total = base * price_norm
-    if is_reverse:
-        total += base * price_norm # R ဆို နှစ်ခါတွက်
-
-    return base, total
-
-
-# =====================
-# 🔥 MAIN PARSE
-# =====================
-def parse_message(text):
-
-    raw_text = text
-    work_text = clean_text(normalize(text))
-
-    # Split by symbols
-    work_text = work_text.replace("=", "\n")
-    work_text = work_text.replace("-", "\n")
-    work_text = work_text.replace("*", "\n")
-    work_text = work_text.replace("/", "\n")
-    work_text = work_text.replace(".", "\n")
-    work_text = work_text.replace(":", "\n")
-    lines = work_text.splitlines()
-
-    results = []
-    grand_total = 0
-
-    # Get Price ONCE from full text
-    price_norm, price_rev = extract_price_full(raw_text)
-
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-
-        nums = extract_numbers(line)
-        rule = detect_rule(line)
-
-        base, total = calculate(rule, nums, price_norm, price_rev, line)
-
-        grand_total += total
-
-        results.append({
-            "raw": line,
-            "rule": rule,
-            "base": base,
-            "amount": price_norm,
-            "total": int(total)
-        })
-
-    return {
-        "lines": results,
-        "grand_total": int(grand_total)
+    markets = {
+        'du': (['dubai', 'ဒူ', 'du'], 0.07),
+        'me': (['mega', 'me', 'မီ'], 0.07),
+        'maxi': (['maxi', 'max', 'မက်ဆီ', 'မက်စီ', 'စီစီ'], 0.07),
+        'lao': (['lao', 'loa', 'လာအို', 'လာလာ'], 0.07),
+        'ld': (['london', 'ld', 'လန်လန်', 'လန်ဒန်'], 0.07),
+        'mm': (['mm', 'မြန်မာ'], 0.10),
+        'glo': (['global', 'glo', 'ဂလို'], 0.03)
     }
+
+    for key, (aliases, rate) in markets.items():
+        if any(alias in text for alias in aliases):
+            discount = rate
+            market_found = key.upper()
+            break
+
+    total_amt = 0
+    # Error checking: ဂဏန်းအတွဲလိုက်ကြီးဖြစ်နေပြီး ပိုက်ဆံမပါရင် (ဥပမာ 35 45 6)
+    # ဒါပေမယ့် တွက်နည်းထဲမှာ ပါသွားရင် error မတက်အောင် logic ထည့်ထားတယ်
+
+    # 1. R (အာ) Logic: 12r500
+    r_matches = re.findall(r'(\d{2})r(\d+)', text)
+    for num, amt in r_matches:
+        total_amt += int(amt) * 2
+
+    # 2. Direct: 12-500, 12=500, 12ဒဲ့500
+    d_matches = re.findall(r'(\d{2})(?:[=-]|ဒဲ့)(\d+)', text)
+    for num, amt in d_matches:
+        total_amt += int(amt)
+
+    # 3. ပတ်သီး: 9ပတ် 1000 (19 ကွက်)
+    p_matches = re.findall(r'(\d)(?:ပတ်|အပါ|ပါ|by|bi|ch)(\d+)', text)
+    for digit, amt in p_matches:
+        total_amt += int(amt) * 19
+
+    # 4. ပတ်ပူးပို: 9ပတ်အပူးပို (20 ကွက်)
+    pp_matches = re.findall(r'(\d)(?:ပတ်ပူး|ပူးပို|ပတ်ပူးပို|ထန|ထပ|ထိပ်ပိတ်|ထိပ်နောက်)(\d+)', text)
+    for digit, amt in pp_matches:
+        total_amt += int(amt) * 20
+
+    # 5. ထိပ်စီး: 2ထိပ် 500 (10 ကွက်)
+    t_matches = re.findall(r'(\d)(?:ထိပ်|ထ|top|t)(\d+)', text)
+    for digit, amt in t_matches:
+        total_amt += int(amt) * 10
+
+    # 6. ဘရိတ်: 1ဘရိတ် 1000 (10 ကွက်) - 385bk500 လိုမျိုး ခွဲထုတ်ခြင်း
+    bk_matches = re.findall(r'(\d+)(?:ဘရိတ်|bk)(\d+)', text)
+    for digits, amt in bk_matches:
+        total_amt += (len(digits) * 10 * int(amt))
+
+    # 7. ခွေဂဏန်း: 123ခွေ 500 (n * n-1)
+    k_matches = re.findall(r'(\d{3,})(?:ခွေ|အခွေ|ခ)(\d+)', text)
+    for digits, amt in k_matches:
+        n = len(digits)
+        total_amt += (n * (n - 1)) * int(amt)
+
+    # 8. အပူးပါခွေ: 123ပူး 500 (ခွေ + n)
+    kp_matches = re.findall(r'(\d{3,})(?:ပူး|အပူးပါ|ခပ|အခွေပူး)(\d+)', text)
+    for digits, amt in kp_matches:
+        n = len(digits)
+        total_amt += ((n * (n - 1)) + n) * int(amt)
+
+    # 9. အပူးစုံ: 10 ကွက်
+    if 'အပူးစုံ' in text or 'အပူး' in text or 'ပူး' in text:
+        pu_amt = re.findall(r'(?:အပူးစုံ|အပူး|ပူး)(\d+)', text)
+        for amt in pu_amt: total_amt += int(amt) * 10
+
+    # 10. စုံဘရိတ်: 50 ကွက်
+    sbk_matches = re.findall(r'(?:စုံဘရိတ်|စုံbk|စဘရိတ်)(\d+)', text)
+    for amt in sbk_matches: total_amt += 50 * int(amt)
+
+    # 11. ကပ်: 234ကို678ကပ်R (n * n)
+    kap_matches = re.findall(r'(\d+)ကို(\d+)ကပ်r?(\d+)', text)
+    for d1, d2, amt in kap_matches:
+        total_amt += (len(d1) * len(d2)) * int(amt)
+        if 'r' in text.lower(): total_amt *= 2
+
+    return total_amt, discount, market_found
