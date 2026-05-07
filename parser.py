@@ -1,98 +1,218 @@
-import asyncio
-import os
 import re
-from aiogram import Bot, Dispatcher
-from aiogram.types import Message
-from aiogram.filters import CommandStart
-from dotenv import load_dotenv
 
-from parser import parse_message
+# =====================
+# 🔥 RULE KEYWORDS
+# =====================
+RULES = {
+    "direct": ["ဒဲ့", " ", "-", "*", "/", "."],
 
-load_dotenv()
+    "r": ["r", "အာ"],
 
-TOKEN = os.getenv("BOT_TOKEN")
+    "pat": ["ပတ်", "ပါ", "အပါ"],
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
+    "pat_pu": ["ပတ်ပူး", "ပူးပို", "ပတ်ပူးပို", "ထပ်", "ထန်", "ထိပ်ပိတ်", "ထိပ်နောက်"],
 
-# 🔥 2D NAME LIST
-MARKETS = ["du", "mega", "မီ", "max", "glo", "ld", "lao", "mm"]
-PERCENT = {
-    "du": 7,
-    "mega": 7,
-    "မီ": 7,
-    "max": 7,
-    "glo": 7,
-    "ld": 7,
-    "lao": 7,
-    "mm": 10
+    "top": ["ထိပ်", "ထ", "top", "t"],
+
+    "brake": ["ဘရိတ်", "bk"],
+
+    "even_brake": ["စုံဘရိတ်", "စဘရိတ်", "စုံbk", "မbk", "မဘရိတ်"],
+
+    "khwe": ["ခွေ", "ခ", "အခွေ"],
+
+    "khwe_pu": ["ခွေပူး", "ပူး", "အပူး"],
+
+    "power": ["ပါဝါ", "pw", "ပဝ"],
+
+    "nk": ["နက္ခတ်", "nk", "နက်", "နခ"],
+
+    "bro": ["ညီကို", "ညီအကို", "ညီအစ်ကို"],
+
+    "pait": ["ပိတ်", "အပိတ်", "ပ"],
+
+    "ma_pu": ["မပူး"],
+
+    "so_pu": ["စုံပူး"],
+
+    "sam": ["စမ", "စစ", "မမ", "စုံစုံ", "စုံမ", "မစုံ"],
+
+    "khap": ["ခပ်"],
+
+    "kap": ["ကပ်", "ကို", "အကပ်"]
 }
 
+# =====================
+# 🔥 NORMALIZE
+# =====================
+def normalize(text):
+    return text.lower()
 
-@dp.message(CommandStart())
-async def start(message: Message):
-    await message.reply("Bot စပြီး run နေပြီ ✅")
+# =====================
+# 🔥 CLEAN TEXT
+# =====================
+def clean_text(text):
+    text = re.sub(r'\bme\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bdu\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bmm\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\blaos\s*\d+\b', '', text, flags=re.IGNORECASE)
+    text = re.sub(r'\bld\s*\d+\b', '', text, flags=re.IGNORECASE)
+    return text
 
+# =====================
+# 🔥 EXTRACT
+# =====================
+def extract_numbers(text):
+    return re.findall(r"\d+", text)
 
-@dp.message()
-async def handle(message: Message):
+def extract_price_full(text):
+    """
+    Return (price_norm, price_rev)
+    """
+    numbers = re.findall(r"\d+", text)
+    if not numbers:
+        return 0, 0
 
-    text = message.text.lower()
-    user_name = message.from_user.first_name or "User"
-
-    # ❌ no number → ignore
-    if not re.search(r"\d", text):
-        return
-
-    # ❌ no 2D name → mention owner/admin
-    market_found = None
-    percent = 7
-    for m in MARKETS:
-        if m in text:
-            market_found = m.upper()
-            percent = PERCENT.get(m, 7)
-            break
-
-    if not market_found:
-        admins = await message.chat.get_administrators()
-        mentions = []
-        for a in admins:
-            if a.user.username:
-                mentions.append(f"@{a.user.username}")
-        if not mentions:
-            mentions = ["@owner", "@admin1"]
-
-        await message.reply(
-            f"📢 {' '.join(mentions)}\n"
-            f"⚠️ {user_name} ရဲ့ဒါလေးလာစစ်ပေးပါရှင့်"
-        )
-        return
-
-    # 🔥 PARSE
-    data = parse_message(message.text)
-    total_amount = data["grand_total"]
+    # Check for reverse format XrY
+    match_rev = re.search(r'(\d+)\s*[rR]\s*(\d+)', text)
+    if match_rev:
+        return int(match_rev.group(1)), int(match_rev.group(2))
     
-    if total_amount == 0:
-        return # လုံးဝမတွက်ချက်ရင် ပြန်မပေးတော့ဘူး
+    # Otherwise take LAST number as price
+    last_num = int(numbers[-1])
+    return last_num, last_num
 
-    discount = int(total_amount * (percent / 100))
-    final = total_amount - discount
+# =====================
+# 🔥 RULE DETECT
+# =====================
+def detect_rule(text):
+    for rule, keys in RULES.items():
+        for k in keys:
+            if k in text:
+                return rule
+    return "direct"
 
-    # 🔥 OUTPUT FORMAT
-    reply = (
-        f"👤 {user_name}\n"
-        f"{market_found} Total = {total_amount:,} ကျပ်\n"
-        f"{percent}% Cash Back = {discount:,} ကျပ်\n"
-        f"Total = {final:,} ကျပ်ဘဲ လွဲပါရှင့်\n"
-        f"ကံကောင်းပါစေ"
-    )
+# =====================
+# 🔥 CALC ENGINE
+# =====================
+def calculate(rule, nums, price_norm, price_rev, line):
 
-    await message.reply(reply)
+    n = len(nums)
+    base = 0
+
+    if rule == "khwe":
+        base = n * (n - 1)
+
+    elif rule == "khwe_pu":
+        base = (n * (n - 1)) + n
+
+    elif rule == "pat":
+        base = 19
+
+    elif rule == "pat_pu":
+        base = 20
+
+    elif rule == "top":
+        base = 10
+
+    elif rule == "brake":
+        if nums:
+            base = int(nums[0])
+        else:
+            base = 10
+
+    elif rule == "even_brake":
+        base = 50
+
+    elif rule == "power":
+        base = 10
+
+    elif rule == "nk":
+        base = 10
+
+    elif rule == "bro":
+        base = 20
+
+    elif rule == "pait":
+        base = 10
+
+    elif rule == "ma_pu":
+        base = 5
+
+    elif rule == "so_pu":
+        base = 5
+
+    elif rule == "sam":
+        base = 25
+
+    elif rule == "khap":
+        if nums:
+            n_digit = len(nums[0])
+            base = n_digit * n_digit
+        else:
+            base = 0
+
+    elif rule == "kap":
+        if len(nums) >= 2:
+            base = len(nums[0]) * len(nums[1])
+        else:
+            base = 0
+
+    else: # direct
+        base = len(nums) if nums else 0
+
+    # --- Reverse Check ---
+    is_reverse = bool(re.search(r'r|အာ', line))
+    
+    total = base * price_norm
+    if is_reverse and price_rev != price_norm:
+        total += base * price_rev
+
+    return base, total
 
 
-async def main():
-    await dp.start_polling(bot)
+# =====================
+# 🔥 MAIN PARSE
+# =====================
+def parse_message(text):
 
+    raw_text = text
+    work_text = clean_text(normalize(text))
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    # Split by symbols
+    work_text = work_text.replace("=", "\n")
+    work_text = work_text.replace("-", "\n")
+    work_text = work_text.replace("*", "\n")
+    work_text = work_text.replace("/", "\n")
+    work_text = work_text.replace(".", "\n")
+    lines = work_text.splitlines()
+
+    results = []
+    grand_total = 0
+
+    # Get Price ONCE from full text
+    price_norm, price_rev = extract_price_full(raw_text)
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        nums = extract_numbers(line)
+        rule = detect_rule(line)
+
+        base, total = calculate(rule, nums, price_norm, price_rev, line)
+
+        grand_total += total
+
+        results.append({
+            "raw": line,
+            "rule": rule,
+            "base": base,
+            "amount": price_norm,
+            "total": int(total)
+        })
+
+    return {
+        "lines": results,
+        "grand_total": int(grand_total)
+    }
