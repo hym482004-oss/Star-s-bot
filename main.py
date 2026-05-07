@@ -1,109 +1,59 @@
-import asyncio
 import os
+import logging
 import re
-from aiogram import Bot, Dispatcher
-from aiogram.types import Message
-from aiogram.filters import CommandStart
-from dotenv import load_dotenv
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
+from parser import get_combinations
 
-from parser import parse_message
-
-load_dotenv()
-
+# Railway Variables ထဲမှာ BOT_TOKEN ထည့်ရပါမယ်
 TOKEN = os.getenv("BOT_TOKEN")
+# သင်ပေးထားတဲ့ ID နှစ်ခုလုံးကို ထည့်ထားပေးပါတယ်
+ALLOWED_GROUP_IDS = [-1003856540486, 6023513934] 
 
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
+logging.basicConfig(level=logging.INFO)
 
-# 🔥 MARKET LIST & PERCENTAGE
-MARKETS = {
-    "du": ["du", "dubai", "ဒူ", "ဒူဘိုင်း"],
-    "me": ["me", "mega", "မီ", "မီဂါ"],
-    "max": ["maxi", "max", "မက်ဆီ", "မက်စီ"],
-    "glo": ["glo", "global", "ဂလို", "ဂလိုဘယ်"],
-    "ld": ["ld", "london", "လန်ဒန်", "လန်လန်"],
-    "lao": ["lao", "laos", "loadon", "laodon", "လာအို", "လာလာ"],
-    "mm": ["mm"]
-}
-
-PERCENT = {
-    "du": 7,
-    "me": 7,
-    "max": 7,
-    "glo": 3,
-    "ld": 7,
-    "lao": 7,
-    "mm": 10
-}
-
-
-@dp.message(CommandStart())
-async def start(message: Message):
-    await message.reply("Bot စပြီး run နေပြီ ✅")
-
-
-@dp.message()
-async def handle(message: Message):
-
-    text = message.text.lower()
-    user_name = message.from_user.first_name or "User"
-
-    # ❌ no number → ignore
-    if not re.search(r"\d", text):
+async def handle_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id not in ALLOWED_GROUP_IDS:
         return
 
-    # 🔍 DETECT MARKET
-    market_found = None
-    percent = 7
-    for key, names in MARKETS.items():
-        for name in names:
-            if name.lower() in text:
-                market_found = key.upper()
-                percent = PERCENT.get(key, 7)
-                break
-        if market_found:
-            break
-
-    if not market_found:
-        admins = await message.chat.get_administrators()
-        mentions = []
-        for a in admins:
-            if a.user.username:
-                mentions.append(f"@{a.user.username}")
-        if not mentions:
-            mentions = ["@owner", "@admin1"]
-
-        await message.reply(
-            f"📢 {' '.join(mentions)}\n"
-            f"⚠️ {user_name} ရဲ့ဒါလေးလာစစ်ပေးပါရှင့်"
-        )
-        return
-
-    # 🔥 PARSE
-    data = parse_message(message.text)
-    total_amount = data["grand_total"]
+    msg_text = update.message.text
+    user = update.message.from_user
     
-    if total_amount == 0:
-        return # လုံးဝမတွက်ချက်ရင် ပြန်မပေးတော့ဘူး
+    total_raw, discount_rate, market_name = get_combinations(msg_text)
+    
+    if total_raw == 0:
+        # ဂဏန်းတွဲပါပြီး amount မပါရင် သတိပေးချက် (ဥပမာ ၃၅ ၄၅ ၆)
+        # အနည်းဆုံး ဂဏန်း ၂ လုံးအတွဲ ၂ ခုထက်ပိုပါပြီး ပိုက်ဆံမပါရင် error ပြမယ်
+        if len(re.findall(r'\d{2}', msg_text)) >= 2 and not re.search(r'\d{3,}', msg_text):
+            await update.message.reply_text("⚠️ တွက်နည်းထဲမှာ ပိုက်ဆံပမာဏ (amount) မပါတာ ရှိနေပါတယ်၊ ပြန်စစ်ပေးပါရှင့်။")
+        return
 
-    discount = int(total_amount * (percent / 100))
-    final = total_amount - discount
+    # Market Name မပါရင် Admin Mention ခေါ်ခြင်း
+    if not market_name:
+        admins = await update.effective_chat.get_administrators()
+        mentions = " ".join([f"@{a.user.username}" for a in admins if not a.user.is_bot and a.user.username])
+        await update.message.reply_text(f"{mentions} ဒါလေးလာစစ်ပေးပါရှင့် (Market Name မပါလို့ပါ)")
+        return
 
-    # 🔥 OUTPUT FORMAT
-    reply = (
-        f"👤 {user_name}\n"
-        f"{market_found} Total = {total_amount:,} ကျပ်\n"
-        f"{percent}% Cash Back = {discount:,} ကျပ်\n"
-        f"Total = {final:,} ကျပ်ဘဲ လွဲပါရှင့်\n"
+    # တွက်ချက်မှု ရလဒ်
+    cashback = total_raw * discount_rate
+    final_total = total_raw - cashback
+
+    # Bot Reply ပုံစံ (သင်ပေးထားသည့်အတိုင်း)
+    response = (
+        f"👤 {user.first_name}{market_name}\n"
+        f"Total = {total_raw:,.0f} ကျပ်\n"
+        f"{discount_rate*100:.0f}% Cash Back = {cashback:,.0f} ကျပ်\n"
+        f"Total = {final_total:,.0f} ကျပ် ဘဲ လွဲပါရှင့်\n\n"
         f"ကံကောင်းပါစေ"
     )
 
-    await message.reply(reply)
+    await update.message.reply_text(response)
 
-
-async def main():
-    await dp.start_polling(bot)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+if __name__ == '__main__':
+    if not TOKEN:
+        print("Error: BOT_TOKEN not found in environment variables.")
+    else:
+        app = ApplicationBuilder().token(TOKEN).build()
+        app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_msg))
+        app.run_polling()
