@@ -1,125 +1,146 @@
 import re
 
 # =====================
-# 🔥 RULE KEYWORDS
+# 🔥 KEYWORDS (longer-first + group order matters)
 # =====================
-RULES = {
-    # ⚠️ direct ထဲက " " (space) ဖယ်လိုက်ပါ (အမြဲ direct ဖြစ်သွားတတ်လို့)
-    "direct": ["ဒဲ့", "-", "*", "/", ".", ":"],
-    "r": ["r", "အာ"],
-    "pat_pu": ["ပတ်ပူး", "ပူးပို", "ပတ်ပူးပို", "ထပ်", "ထန်", "ထိပ်ပိတ်", "ထိပ်နောက်"],
-    "pat": ["ပတ်", "ပါ", "p", "အပါ", "by", "bi"],
-    "top": ["ထိပ်", "ထ", "top", "t"],
-    "even_brake": ["စုံဘရိတ်", "စဘရိတ်", "စုံbk", "မbk", "မဘရိတ်"],
-    "brake": ["ဘရိတ်", "bk"],
-    "khwe_pu": ["ခွေပူး", "ပူး", "အပူး"],
-    "khwe": ["ခွေ", "ခ", "အခွေ"],
-    "power": ["ပါဝါ", "pw", "ပဝ"],
-    "nk": ["နက္ခတ်", "nk", "နက်", "နခ"],
-    "bro": ["ညီကို", "ညီအကို", "ညီအစ်ကို"],
-    "ma_pu": ["မပူး", "မပိတ်"],
-    "pait": ["ပိတ်", "အပိတ်", "ပိတိ", "ပ"],
-    "so_pu": ["စုံပူး"],
-    "sam": ["စမ", "စစ", "မမ", "စုံစုံ", "စုံမ", "မစုံ"],
-    "khap": ["ခပ်"],
-    "kap": ["ကပ်", "ကို", "အကပ်"]
+KEYWORDS = {
+    "bro": ["ညီအစ်ကို", "ညီအကို", "ညီကို"],
+
+    "pat_pu": ["ပတ်ပူးပို", "ပူးပို", "ပတ်ပူး", "ပတ်အကွက်20", "ထိပ်ပိတ်", "ထိပ်နောက်", "ထန", "ထပ"],
+    "pat": ["ပတ်သီး", "အပါ", "ပတ်", "ပါ", "ch", "p"],
+
+    "even_brake": ["စုံဘရိတ်", "စဘရိတ်", "စုံbk", "စုံBk", "မbk", "မBk", "မဘရိတ်"],
+    "brake": ["ဘရိတ်", "bk", "Bk"],
+
+    "top": ["ထိပ်စီး", "ထိပ်", "top", "Top", "t", "T", "ထ"],
+
+    "power": ["ပါဝါ", "power", "pw", "ပဝ"],
+    "nk": ["နက္ခတ်", "nk", "Nk", "နက", "နခ"],
+
+    "ten": ["ဆယ်ပြည့်", "ဆယ်ပြည်", "ဆယ့်ပြည်"],
+
+    # ပိတ် group (single-char "ပ","န" ကို boundary နဲ့ပဲဖမ်းမယ်)
+    "pait": ["အပိတ်", "ပိတ်", "နောက်"],
+
+    # ပူး fixed group (အပူး 500 လို digits မပါတဲ့အခါ)
+    "puu_fixed": ["အပူးစုံ", "အပူးအစုံ", "အပူးအကုန်", "အပူး", "ပူး", "puu", "ပုး"],
+
+    # စပူး/မပူး => 5 ကွက်
+    "so_pu": ["စပူး", "စုံပူး", "မပူး"],
+
+    # စစ/မမ/စမ... => 25 ကွက်
+    "sam": ["စုံစုံ", "စုံမ", "စစ", "မမ", "စမ", "မစ", "စုူံစူံ", "စူံစုံ", "စုံစူံ"],
+
+    # ခွေ / ခွေပူး
+    "khwe_pu": ["အပူးပါခွေပူး", "အပူးပါခွေ", "အပူးအပြီးပါ", "ခွေပူး", "အခွေပူး", "ခပ", "ခွေပူး"],
+    "khwe": ["အခွေ", "ခွေ", "ခ"],
+
+    # ကပ်
+    "kap": ["အကပ်", "ကပ်", "ကို"],
+
+    # direct marker (ဒါမတွေ့ရင်လည်း default direct ပဲ)
+    "direct": ["ဒဲ့", "=", "-", "*", "/", ".", ":"],
 }
 
-# =====================
-# 🔥 NORMALIZE
-# =====================
-def normalize(text):
-    return text.lower()
-
-# =====================
-# 🔥 CLEAN TEXT
-# =====================
-def clean_text(text):
-    text = re.sub(r'\b(me|mega|မီ|မီဂါ)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(du|dubai|ဒူ|ဒူဘိုင်း)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(mm)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(lao|laos|loadon|laodon|လာအို|လာလာ)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(ld|london|လန်ဒန်|လန်လန်)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(glo|global|ဂလို)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    text = re.sub(r'\b(maxi|max|မက်ဆီ|မက်စီ)\s*\d+\b', '', text, flags=re.IGNORECASE)
-    return text
-
-# =====================
-# ✅ Extract "nums" and "amount" per line
-# =====================
-def split_nums_and_price(line):
-    """
-    line ထဲက:
-    - amount (ထိုးကြေး) ကို ခွဲထုတ်မယ်
-    - amount ကို nums ထဲကနေ ဖယ်ပြီး nums ကိုသာ ပြန်မယ်
-
-    Rules:
-    1) 'r100' / 'အာ100' ရှိရင် 100 ကို amount သတ်မှတ်
-    2) မရှိရင် last number ကို amount သတ်မှတ်
-    """
-    raw = line
-
-    # case: r100 / r 100 / အာ100 / အာ 100
-    m = re.search(r'(?i)(r|အာ)\s*(\d+)', raw)
-    if m:
-        price = int(m.group(2))
-        # r100 ကို line ထဲကနေ ဖယ် (amount ကို nums ထဲမဝင်စေဖို့)
-        without_price = re.sub(r'(?i)(r|အာ)\s*\d+', ' ', raw)
-        nums = re.findall(r'\d+', without_price)
-        return nums, price, raw
-
-    # else: last number = price
-    all_nums = re.findall(r'\d+', raw)
-    if not all_nums:
-        return [], 0, raw
-
-    price = int(all_nums[-1])
-
-    # last number တစ်ခုပဲ ဖယ်
-    without_price = re.sub(r'(\d+)(?!.*\d)', ' ', raw)
-    nums = re.findall(r'\d+', without_price)
-    return nums, price, raw
-
-# =====================
-# ✅ RULE DETECT (priority fix)
-# =====================
 RULE_ORDER = [
+    "bro",
     "pat_pu", "pat",
     "even_brake", "brake",
-    "khwe_pu", "khwe",
     "top",
-    "power", "nk", "bro",
-    "ma_pu", "pait", "so_pu", "sam",
-    "khap", "kap",
-    "direct"
+    "power", "nk",
+    "ten",
+    "pait",
+    "khwe_pu", "khwe",
+    "kap",
+    "so_pu",
+    "sam",
+    "puu_fixed",
+    "direct",
 ]
 
-def detect_rule(text):
+SEPS_CLASS = r"[ \t,\-*/=.:]"
+
+def _contains_token(text: str, token: str) -> bool:
+    """single-char (e.g. 'ပ','န') ကိုတော့ separator boundary နဲ့ပဲ match လုပ်"""
+    if not token:
+        return False
     t = text.lower()
+    k = token.lower()
+
+    # ASCII tokens: simple contains
+    if re.fullmatch(r"[a-z0-9]+", k):
+        return k in t
+
+    # single Burmese char => require boundary
+    if len(k) == 1:
+        return re.search(rf"(?:^|{SEPS_CLASS}){re.escape(k)}(?:$|{SEPS_CLASS})", t) is not None
+
+    return k in t
+
+def detect_rule(line: str) -> str:
     for rule in RULE_ORDER:
-        for k in RULES.get(rule, []):
-            if k and (k.lower() in t):
+        for k in KEYWORDS.get(rule, []):
+            if _contains_token(line, k):
                 return rule
     return "direct"
 
+def has_reverse(line: str) -> bool:
+    # r / R should not match inside 'brake'
+    if re.search(r"(?i)(?:^|[^a-z0-9])r(?:\s*\d+)?", line):
+        return True
+    if "အာ" in line:
+        return True
+    return False
+
+def split_bets_and_amounts(line: str):
+    """
+    return:
+      bets: list[str]  (amount numbers removed)
+      amount_sum: int  (normal + R amounts)
+      rev_flag: bool   (R keyword exists)
+    """
+    raw = line
+    rev_flag = has_reverse(raw)
+
+    # 1) reverse amounts: r200 / အာ200
+    rev_amounts = [int(x) for x in re.findall(r"(?i)(?:^|[^a-z0-9])(?:r|အာ)\s*(\d+)", raw)]
+
+    # remove reverse amount parts so they don't get treated as bet numbers
+    tmp = re.sub(r"(?i)(?:r|အာ)\s*\d+", " ", raw)
+
+    # 2) find all remaining numbers (candidates: bet numbers + maybe normal amount)
+    nums = [m.group(0) for m in re.finditer(r"\d+", tmp)]
+
+    normal_amount = 0
+
+    # heuristic: normal amount usually >= 3 digits (500,1000,5000...)
+    # take the RIGHTMOST >=3-digit as amount if exists
+    idx_amount = None
+    for i in range(len(nums) - 1, -1, -1):
+        if len(nums[i]) >= 3:
+            idx_amount = i
+            break
+
+    # if no >=3-digit and NO reverse amount => last number is amount (e.g. "12 50")
+    if idx_amount is None and not rev_amounts and len(nums) >= 2:
+        idx_amount = len(nums) - 1
+
+    if idx_amount is not None and nums:
+        normal_amount = int(nums[idx_amount])
+        bets = [n for j, n in enumerate(nums) if j != idx_amount]
+    else:
+        bets = nums
+
+    amount_sum = normal_amount + sum(rev_amounts)
+    return bets, amount_sum, rev_flag
+
 # =====================
-# 🔥 CALC ENGINE
+# 🔥 CALC ENGINE (your spec)
 # =====================
-def calculate(rule, nums, price_norm, line):
-
-    n = len(nums)
-    base = 0
-
-    if rule == "khwe":
-        base = n * (n - 1)
-
-    elif rule == "khwe_pu":
-        if nums:
-            all_digits = ''.join(nums)  # nums are strings of digits
-            count = len(all_digits)
-            base = count * count
-        else:
-            base = 0
+def calculate(rule: str, bets: list[str], amount_sum: int, rev_flag: bool):
+    # base slots
+    if rule == "bro":
+        base = 20
 
     elif rule == "pat":
         base = 19
@@ -127,104 +148,81 @@ def calculate(rule, nums, price_norm, line):
     elif rule == "pat_pu":
         base = 20
 
-    elif rule == "top":
-        base = (len(nums) * 10) if nums else 10
+    elif rule in ("top", "brake"):
+        # each bet digit => 10 slots (3ထိပ် + 8ထိပ် => 20)
+        base = (len(bets) * 10) if bets else 10
 
-    elif rule == "brake":
-        base = (len(nums) * 10) if nums else 10
-
-    elif rule == "even_brake":
-        base = 50
-
-    elif rule == "power":
+    elif rule in ("power", "nk", "pait", "ten"):
         base = 10
 
-    elif rule == "nk":
+    elif rule == "puu_fixed":
+        # "အပူး 500" => 10 slots (00..99 doubles)
+        # "123ပူး 500" လို bets ပါလာရင် khwe_pu အနေနဲ့အောက်မှာ handle လုပ်မယ်
         base = 10
-
-    elif rule == "bro":
-        base = 20
-
-    elif rule == "pait":
-        base = 10
-
-    elif rule == "ma_pu":
-        base = 50
 
     elif rule == "so_pu":
-        base = 25
+        base = 5
 
     elif rule == "sam":
         base = 25
 
-    elif rule == "khap":
-        if nums:
-            n_digit = len(nums[0])
-            base = n_digit * n_digit
-        else:
-            base = 0
+    elif rule == "khwe":
+        # n = digit count of all bets joined (e.g., 123 -> 3)
+        digits = "".join(bets)
+        n = len(digits)
+        base = n * (n - 1)
+
+    elif rule == "khwe_pu":
+        # N×N
+        digits = "".join(bets)
+        n = len(digits)
+        base = n * n
 
     elif rule == "kap":
-        if len(nums) >= 2:
-            base = len(nums[0]) * len(nums[1])
+        # a×b where a,b are digit lengths of first two bet numbers
+        if len(bets) >= 2:
+            base = len(bets[0]) * len(bets[1])
         else:
             base = 0
 
     else:  # direct
-        base = len(nums) if nums else 0
+        base = len(bets)
 
-    # Ignore single digit like 4 in 4:30
-    if len(nums) == 1 and len(nums[0]) == 1 and (":" in line or "." in line):
-        base = 0
+    # if "ပူး" keyword but bets ပါနေပြီး digits>=3 ဆို khwe_pu သဘောတရားထား (123ပူး)
+    if rule == "puu_fixed" and bets:
+        digits = "".join(bets)
+        if len(digits) >= 3:
+            base = len(digits) * len(digits)  # N×N
 
-    # Reverse (r / အာ) => double
-    is_reverse = bool(re.search(r'(?i)(r|အာ)\s*\d+', line))
-    total = base * price_norm
-    if is_reverse:
-        total += base * price_norm
+    # Reverse => base 2 ဆ (ကွက် ၂ ဆ)
+    eff_base = base * 2 if rev_flag else base
 
-    return base, total
+    total = eff_base * amount_sum
+    return eff_base, total
 
 # =====================
-# 🔥 MAIN PARSE
+# 🔥 MAIN PARSE (newline only)
 # =====================
-def parse_message(text):
-
-    work_text = clean_text(normalize(text))
-
-    # Split by symbols (space, -, *, /, ., :, =)
-    work_text = work_text.replace("=", "\n")
-    work_text = work_text.replace("-", "\n")
-    work_text = work_text.replace("*", "\n")
-    work_text = work_text.replace("/", "\n")
-    work_text = work_text.replace(".", "\n")
-    work_text = work_text.replace(":", "\n")
-    lines = work_text.splitlines()
+def parse_message(text: str):
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
 
     results = []
     grand_total = 0
 
     for line in lines:
-        line = line.strip()
-        if not line:
-            continue
+        rule = detect_rule(line)
+        bets, amount_sum, rev_flag = split_bets_and_amounts(line)
 
-        nums, price_norm, raw_line = split_nums_and_price(line)
-        rule = detect_rule(raw_line)
-
-        base, total = calculate(rule, nums, price_norm, raw_line)
+        base, total = calculate(rule, bets, amount_sum, rev_flag)
 
         grand_total += total
-
         results.append({
-            "raw": raw_line,
+            "raw": line,
             "rule": rule,
-            "base": base,
-            "amount": price_norm,
-            "total": int(total)
+            "base": int(base),
+            "amount_sum": int(amount_sum),
+            "total": int(total),
         })
 
-    return {
-        "lines": results,
-        "grand_total": int(grand_total)
-    }
+    return {"lines": results, "grand_total": int(grand_total)}
+    
