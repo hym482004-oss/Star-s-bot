@@ -4,20 +4,21 @@ import re
 # 🔥 RULE KEYWORDS
 # =====================
 RULES = {
-    "direct": ["ဒဲ့", " ", "-", "*", "/", ".", ":"],
+    # ⚠️ direct ထဲက " " (space) ဖယ်လိုက်ပါ (အမြဲ direct ဖြစ်သွားတတ်လို့)
+    "direct": ["ဒဲ့", "-", "*", "/", ".", ":"],
     "r": ["r", "အာ"],
-    "pat": ["ပတ်", "ပါ", "p", "အပါ", "by", "bi"],
     "pat_pu": ["ပတ်ပူး", "ပူးပို", "ပတ်ပူးပို", "ထပ်", "ထန်", "ထိပ်ပိတ်", "ထိပ်နောက်"],
+    "pat": ["ပတ်", "ပါ", "p", "အပါ", "by", "bi"],
     "top": ["ထိပ်", "ထ", "top", "t"],
-    "brake": ["ဘရိတ်", "bk"],
     "even_brake": ["စုံဘရိတ်", "စဘရိတ်", "စုံbk", "မbk", "မဘရိတ်"],
-    "khwe": ["ခွေ", "ခ", "အခွေ"],
+    "brake": ["ဘရိတ်", "bk"],
     "khwe_pu": ["ခွေပူး", "ပူး", "အပူး"],
+    "khwe": ["ခွေ", "ခ", "အခွေ"],
     "power": ["ပါဝါ", "pw", "ပဝ"],
     "nk": ["နက္ခတ်", "nk", "နက်", "နခ"],
     "bro": ["ညီကို", "ညီအကို", "ညီအစ်ကို"],
-    "pait": ["ပိတ်", "အပိတ်", "ပိတိ", "ပ"],
     "ma_pu": ["မပူး", "မပိတ်"],
+    "pait": ["ပိတ်", "အပိတ်", "ပိတိ", "ပ"],
     "so_pu": ["စုံပူး"],
     "sam": ["စမ", "စစ", "မမ", "စုံစုံ", "စုံမ", "မစုံ"],
     "khap": ["ခပ်"],
@@ -44,130 +45,151 @@ def clean_text(text):
     return text
 
 # =====================
-# 🔥 EXTRACT
+# ✅ Extract "nums" and "amount" per line
 # =====================
-def extract_numbers(text):
-    return re.findall(r"\d+", text)
-
-def extract_price_full(text):
+def split_nums_and_price(line):
     """
-    Return price: take number after R or last number
+    line ထဲက:
+    - amount (ထိုးကြေး) ကို ခွဲထုတ်မယ်
+    - amount ကို nums ထဲကနေ ဖယ်ပြီး nums ကိုသာ ပြန်မယ်
+
+    Rules:
+    1) 'r100' / 'အာ100' ရှိရင် 100 ကို amount သတ်မှတ်
+    2) မရှိရင် last number ကို amount သတ်မှတ်
     """
-    match_rev = re.search(r'[rR]\s*(\d+)', text)
-    if match_rev:
-        p = int(match_rev.group(1))
-        return p, p
-    
-    numbers = re.findall(r"\d+", text)
-    if numbers:
-        last_num = int(numbers[-1])
-        return last_num, last_num
-    
-    return 0, 0
+    raw = line
+
+    # case: r100 / r 100 / အာ100 / အာ 100
+    m = re.search(r'(?i)(r|အာ)\s*(\d+)', raw)
+    if m:
+        price = int(m.group(2))
+        # r100 ကို line ထဲကနေ ဖယ် (amount ကို nums ထဲမဝင်စေဖို့)
+        without_price = re.sub(r'(?i)(r|အာ)\s*\d+', ' ', raw)
+        nums = re.findall(r'\d+', without_price)
+        return nums, price, raw
+
+    # else: last number = price
+    all_nums = re.findall(r'\d+', raw)
+    if not all_nums:
+        return [], 0, raw
+
+    price = int(all_nums[-1])
+
+    # last number တစ်ခုပဲ ဖယ်
+    without_price = re.sub(r'(\d+)(?!.*\d)', ' ', raw)
+    nums = re.findall(r'\d+', without_price)
+    return nums, price, raw
 
 # =====================
-# 🔥 RULE DETECT
+# ✅ RULE DETECT (priority fix)
 # =====================
+RULE_ORDER = [
+    "pat_pu", "pat",
+    "even_brake", "brake",
+    "khwe_pu", "khwe",
+    "top",
+    "power", "nk", "bro",
+    "ma_pu", "pait", "so_pu", "sam",
+    "khap", "kap",
+    "direct"
+]
+
 def detect_rule(text):
-    text_lower = text.lower()
-    for rule, keys in RULES.items():
-        for k in keys:
-            if k in text_lower:
+    t = text.lower()
+    for rule in RULE_ORDER:
+        for k in RULES.get(rule, []):
+            if k and (k.lower() in t):
                 return rule
     return "direct"
 
 # =====================
 # 🔥 CALC ENGINE
 # =====================
-def calculate(rule, nums, price_norm, price_rev, line):
+def calculate(rule, nums, price_norm, line):
 
     n = len(nums)
     base = 0
 
     if rule == "khwe":
         base = n * (n - 1)
+
     elif rule == "khwe_pu":
-        # ခွေပူး = n x n
         if nums:
-            all_digits = ''.join(map(str, nums))
+            all_digits = ''.join(nums)  # nums are strings of digits
             count = len(all_digits)
             base = count * count
         else:
             base = 0
+
     elif rule == "pat":
-        # ပါ / ပတ် / p / by / bi = အမြဲတမ်း 19 ကွက်
         base = 19
+
     elif rule == "pat_pu":
         base = 20
+
     elif rule == "top":
-        # ထိပ် = တစ်လုံးကို 10 ကွက်
-        # 3-8 ထိပ် = 3ထိပ် + 8ထိပ် = 20 ကွက်
-        if nums:
-            count = len(nums)
-            base = count * 10
-        else:
-            base = 10
+        base = (len(nums) * 10) if nums else 10
+
     elif rule == "brake":
-        # ဘရိတ် / bk = တစ်လုံးကို 10 ကွက်
-        if nums:
-            count = len(nums)
-            base = count * 10
-        else:
-            base = 10
+        base = (len(nums) * 10) if nums else 10
+
     elif rule == "even_brake":
         base = 50
+
     elif rule == "power":
         base = 10
+
     elif rule == "nk":
         base = 10
+
     elif rule == "bro":
         base = 20
+
     elif rule == "pait":
-        # ပိတ် = 10 ကွက်
         base = 10
+
     elif rule == "ma_pu":
-        # မပူး / မပိတ် = 50 ကွက်
         base = 50
+
     elif rule == "so_pu":
         base = 25
+
     elif rule == "sam":
         base = 25
+
     elif rule == "khap":
         if nums:
-            n_digit = len(str(nums[0]))
+            n_digit = len(nums[0])
             base = n_digit * n_digit
         else:
             base = 0
+
     elif rule == "kap":
         if len(nums) >= 2:
-            part1 = str(nums[0])
-            part2 = str(nums[1])
-            base = len(part1) * len(part2)
+            base = len(nums[0]) * len(nums[1])
         else:
             base = 0
-    else: # direct
+
+    else:  # direct
         base = len(nums) if nums else 0
 
     # Ignore single digit like 4 in 4:30
-    if len(nums) == 1 and len(str(nums[0])) == 1 and (":" in line or "." in line):
+    if len(nums) == 1 and len(nums[0]) == 1 and (":" in line or "." in line):
         base = 0
 
-    # --- Reverse Check ---
-    is_reverse = bool(re.search(r'r|အာ', line, re.IGNORECASE))
-    
+    # Reverse (r / အာ) => double
+    is_reverse = bool(re.search(r'(?i)(r|အာ)\s*\d+', line))
     total = base * price_norm
     if is_reverse:
-        total += base * price_norm # R ဆို နှစ်ခါတွက်
+        total += base * price_norm
 
     return base, total
-
 
 # =====================
 # 🔥 MAIN PARSE
 # =====================
 def parse_message(text):
 
-    raw_text = text
     work_text = clean_text(normalize(text))
 
     # Split by symbols (space, -, *, /, ., :, =)
@@ -182,23 +204,20 @@ def parse_message(text):
     results = []
     grand_total = 0
 
-    # Get Price ONCE from full text
-    price_norm, price_rev = extract_price_full(raw_text)
-
     for line in lines:
         line = line.strip()
         if not line:
             continue
 
-        nums = extract_numbers(line)
-        rule = detect_rule(line)
+        nums, price_norm, raw_line = split_nums_and_price(line)
+        rule = detect_rule(raw_line)
 
-        base, total = calculate(rule, nums, price_norm, price_rev, line)
+        base, total = calculate(rule, nums, price_norm, raw_line)
 
         grand_total += total
 
         results.append({
-            "raw": line,
+            "raw": raw_line,
             "rule": rule,
             "base": base,
             "amount": price_norm,
